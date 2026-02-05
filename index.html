@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mobile 3D Gesture Particles</title>
+<title>Ultimate Gesture Particles</title>
 <style>
-  body { margin:0; overflow:hidden; background:black; touch-action: none; }
-  video { display:none; }
+  body { margin:0; overflow:hidden; background:black; touch-action:none; }
+  #video { position:absolute; bottom:5px; left:5px; width:150px; border:2px solid white; border-radius:10px; z-index:10; }
 </style>
 </head>
 <body>
-<video id="video" autoplay playsinline></video>
+<video id="video" autoplay playsinline muted></video>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
