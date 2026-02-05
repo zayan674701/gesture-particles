@@ -1,5 +1,8 @@
 let scene, camera, renderer, particles, geometry, material;
 let currentShape = "heart";
+let currentPositions = [], targetPositions = [];
+let morphProgress = 1, isMorphing = false;
+let lastSwitch = 0;
 
 // ---------- INIT ----------
 init();
@@ -7,151 +10,186 @@ animate();
 initHandTracking();
 
 function init() {
-  scene = new THREE.Scene();
+    scene = new THREE.Scene();
 
-  camera = new THREE.PerspectiveCamera(
-    75,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000
-  );
-  camera.position.z = 50;
+    camera = new THREE.PerspectiveCamera(
+        75, window.innerWidth / window.innerHeight, 0.1, 1000
+    );
+    camera.position.z = 50;
 
-  renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-  geometry = new THREE.BufferGeometry();
-  generateShape(currentShape);
+    geometry = new THREE.BufferGeometry();
+    generateShape(currentShape);
 
-  material = new THREE.PointsMaterial({
-    size: 0.5,
-    vertexColors: true
-  });
+    material = new THREE.PointsMaterial({
+        size: 0.5,
+        vertexColors: true
+    });
 
-  particles = new THREE.Points(geometry, material);
-  scene.add(particles);
+    particles = new THREE.Points(geometry, material);
+    scene.add(particles);
 
-  window.addEventListener("resize", onResize);
+    window.addEventListener("resize", onResize);
 }
 
 function onResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 // ---------- SHAPES ----------
 function generateShape(type) {
-  const positions = [];
-  const colors = [];
+    const count = 2500;
+    let positions = [];
+    let colors = [];
 
-  for (let i = 0; i < 2500; i++) {
-    let x = 0, y = 0, z = 0;
+    if (type === "heart") positions = createHeartShape(count);
+    else if (type === "flower") positions = createFlowerShape(count);
+    else positions = createFireworksShape(count);
 
-    if (type === "heart") {
-      let t = Math.random() * Math.PI * 2;
-      x = 16 * Math.pow(Math.sin(t), 3);
-      y =
-        13 * Math.cos(t) -
-        5 * Math.cos(2 * t) -
-        2 * Math.cos(3 * t) -
-        Math.cos(4 * t);
-      z = (Math.random() - 0.5) * 10;
+    for (let i = 0; i < positions.length/3; i++) {
+        colors.push(Math.random(), Math.random(), Math.random());
     }
 
-    if (type === "saturn") {
-      let angle = Math.random() * Math.PI * 2;
-      let radius = 18 + Math.random() * 4;
-      x = Math.cos(angle) * radius;
-      y = (Math.random() - 0.5) * 2;
-      z = Math.sin(angle) * radius;
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+}
+
+function createHeartShape(count) {
+    const arr = [];
+    for (let i = 0; i < count; i++) {
+        const t = Math.random() * Math.PI * 2;
+        const x = 16 * Math.pow(Math.sin(t),3);
+        const y = 13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t);
+        const z = (Math.random() - 0.5) * 6;
+        arr.push(x,y,z);
     }
+    return arr;
+}
 
-    if (type === "fireworks") {
-      x = (Math.random() - 0.5) * 40;
-      y = (Math.random() - 0.5) * 40;
-      z = (Math.random() - 0.5) * 40;
+function createFlowerShape(count) {
+    const arr = [];
+    for (let i = 0; i < count; i++) {
+        const t = Math.random() * Math.PI * 2;
+        const r = 10 * Math.sin(5 * t); // petals
+        const x = r * Math.cos(t);
+        const y = r * Math.sin(t);
+        const z = (Math.random() - 0.5) * 6;
+        arr.push(x,y,z);
     }
+    return arr;
+}
 
-    positions.push(x, y, z);
-    colors.push(Math.random(), Math.random(), Math.random());
-  }
+function createFireworksShape(count) {
+    const arr = [];
+    for (let i = 0; i < count; i++) {
+        const x = (Math.random() - 0.5) * 40;
+        const y = (Math.random() - 0.5) * 40;
+        const z = (Math.random() - 0.5) * 40;
+        arr.push(x,y,z);
+    }
+    return arr;
+}
 
-  geometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(positions, 3)
-  );
-  geometry.setAttribute(
-    "color",
-    new THREE.Float32BufferAttribute(colors, 3)
-  );
+// ---------- MORPH ----------
+function morphToShape(newPositions) {
+    const posAttr = geometry.attributes.position;
+    currentPositions = [...posAttr.array];
+    targetPositions = newPositions;
+    morphProgress = 0;
+    isMorphing = true;
 }
 
 // ---------- HAND TRACKING ----------
 function initHandTracking() {
-  const video = document.getElementById("video");
+    const video = document.getElementById("video");
 
-  const hands = new Hands({
-    locateFile: (file) =>
-      `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
-  });
+    const hands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
 
-  hands.setOptions({
-    maxNumHands: 1,
-    modelComplexity: 1,
-    minDetectionConfidence: 0.7,
-    minTrackingConfidence: 0.7,
-  });
+    hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.7
+    });
 
-  hands.onResults(onHandResults);
+    hands.onResults(onHandResults);
 
-  const cam = new Camera(video, {
-    onFrame: async () => {
-      await hands.send({ image: video });
-    },
-    width: 640,
-    height: 480,
-  });
+    const cameraFeed = new Camera(video, {
+        onFrame: async () => { await hands.send({image: video}); },
+        width: 640,
+        height: 480
+    });
+    cameraFeed.start();
+}
 
-  cam.start();
+// Map MediaPipe to Three.js coordinates
+function mapTo3D(x, y, z) {
+    const mappedX = (x - 0.5) * 50;   // left/right
+    const mappedY = -(y - 0.5) * 50;  // top/bottom
+    const mappedZ = -z * 20;          // depth
+    return { mappedX, mappedY, mappedZ };
 }
 
 // ---------- GESTURES ----------
-let lastSwitch = 0;
-
 function onHandResults(results) {
-  if (!results.multiHandLandmarks.length) return;
+    if (!results.multiHandLandmarks.length) return;
 
-  const hand = results.multiHandLandmarks[0];
-  const indexTip = hand[8];
-  const palm = hand[0];
+    const hand = results.multiHandLandmarks[0];
+    const indexTip = hand[8];
+    const palm = hand[0];
 
-  // Particle scale (hand distance)
-  const scale = THREE.MathUtils.clamp(
-    THREE.MathUtils.mapLinear(indexTip.z, -0.3, 0.3, 2, 8),
-    1,
-    8
-  );
-  particles.scale.set(scale, scale, scale);
+    const { mappedX, mappedY, mappedZ } = mapTo3D(indexTip.x, indexTip.y, indexTip.z);
 
-  // Color control
-  material.color.setHSL(indexTip.x, 1, 0.5);
+    // Scale based on Z
+    const scale = THREE.MathUtils.clamp(1 + mappedZ/10, 1, 8);
+    particles.scale.set(scale, scale, scale);
 
-  // Shape switch (index finger up)
-  const now = Date.now();
-  if (indexTip.y < palm.y - 0.12 && now - lastSwitch > 1200) {
-    lastSwitch = now;
-    const shapes = ["heart", "saturn", "fireworks"];
-    currentShape = shapes[Math.floor(Math.random() * shapes.length)];
-    generateShape(currentShape);
-  }
+    // Rotation based on hand X/Y
+    particles.rotation.y = mappedX / 20;
+    particles.rotation.x = mappedY / 20;
+
+    // Color based on X
+    material.color.setHSL((indexTip.x) % 1, 1, 0.5);
+
+    // Shape switch on finger up
+    const now = Date.now();
+    if (indexTip.y < palm.y - 0.12 && now - lastSwitch > 1200) {
+        lastSwitch = now;
+
+        const count = geometry.attributes.position.count;
+        if (currentShape === "heart") {
+            currentShape = "flower";
+            morphToShape(createFlowerShape(count));
+        } else {
+            currentShape = "heart";
+            morphToShape(createHeartShape(count));
+        }
+    }
 }
 
-// ---------- LOOP ----------
+// ---------- ANIMATE ----------
 function animate() {
-  requestAnimationFrame(animate);
-  particles.rotation.y += 0.002;
-  particles.rotation.x += 0.001;
-  renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+
+    if (isMorphing) {
+        morphProgress += 0.02;
+        if (morphProgress >= 1) { morphProgress = 1; isMorphing = false; }
+
+        const posAttr = geometry.attributes.position;
+        for (let i = 0; i < posAttr.array.length; i++) {
+            posAttr.array[i] =
+                currentPositions[i] +
+                (targetPositions[i] - currentPositions[i]) * morphProgress;
+        }
+        posAttr.needsUpdate = true;
+    }
+
+    renderer.render(scene, camera);
 }
